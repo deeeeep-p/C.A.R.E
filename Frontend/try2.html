@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emergency Processing Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Optional: Custom styles if needed */
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f4f7f6;
+      }
+      /* Style for the preformatted JSON output */
+      pre {
+        white-space: pre-wrap; /* Wrap long lines */
+        word-break: break-all; /* Break words to prevent overflow */
+      }
+      /* Style for the result containers */
+      .result-container {
+        border: 1px solid #e5e7eb; /* gray-200 */
+        border-radius: 0.375rem; /* rounded-md */
+        padding: 1.5rem; /* p-6 */
+        margin-top: 1.5rem; /* mt-6 */
+        background-color: #ffffff; /* bg-white */
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1),
+          0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow-lg */
+      }
+      .result-section {
+        padding: 1rem 0; /* py-4 */
+        border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
+      }
+      .result-section:last-child {
+        border-bottom: none; /* No border for the last section */
+      }
+    </style>
+  </head>
+  <body
+    class="p-4 md:p-8 bg-gray-100 min-h-screen flex items-center justify-center"
+  >
+    <div
+      class="container mx-auto bg-white p-6 md:p-8 rounded-lg shadow-lg w-full max-w-md"
+    >
+      <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">
+        Emergency Processing
+      </h1>
+
+      <div class="mb-4 text-center">
+        <p class="text-sm text-gray-600">
+          WebSocket Status:
+          <span id="ws-status" class="font-semibold text-red-500"
+            >Connecting...</span
+          >
+        </p>
+        <p class="text-sm text-gray-600">
+          Client ID:
+          <span id="client-id" class="font-mono text-gray-700">N/A</span>
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label
+            for="transcript"
+            class="block text-sm font-medium text-gray-700"
+            >Transcript:</label
+          >
+          <textarea
+            id="transcript"
+            rows="4"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+          ></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label
+              for="latitude"
+              class="block text-sm font-medium text-gray-700"
+              >Latitude:</label
+            >
+            <input
+              type="number"
+              id="latitude"
+              step="any"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+            />
+          </div>
+          <div>
+            <label
+              for="longitude"
+              class="block text-sm font-medium text-gray-700"
+              >Longitude:</label
+            >
+            <input
+              type="number"
+              id="longitude"
+              step="any"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+            />
+          </div>
+        </div>
+
+        <button
+          id="process-button"
+          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ease-in-out duration-150"
+        >
+          Process Emergency
+        </button>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-gray-200">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">
+          Messages & Results
+        </h2>
+        <div id="messages" class="space-y-3 text-sm text-gray-700">
+          <p class="text-gray-500">Waiting for interaction...</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Get references to DOM elements
+      const wsStatus = document.getElementById("ws-status");
+      const clientIdSpan = document.getElementById("client-id");
+      const transcriptInput = document.getElementById("transcript");
+      const latitudeInput = document.getElementById("latitude");
+      const longitudeInput = document.getElementById("longitude");
+      const processButton = document.getElementById("process-button");
+      const messagesDiv = document.getElementById("messages");
+
+      // WebSocket connection URL (adjust if your backend is on a different host/port)
+      // Use 'ws://' for insecure WebSocket, 'wss://' for secure WebSocket (needed in production)
+      const wsUrl = `ws://localhost:3000`; // Match your Node.js server port
+
+      // Node.js backend HTTP endpoint URL (USE ABSOLUTE URL)
+      const httpEndpointUrl = `http://localhost:3000/emergency`; // Corrected URL
+
+      // Store the client ID received from the backend
+      let currentClientId = null;
+
+      // Store pending requests by requestId to update results later
+      const pendingRequests = new Map();
+
+      // --- WebSocket Connection Setup ---
+      let websocket;
+
+      function connectWebSocket() {
+        websocket = new WebSocket(wsUrl);
+
+        websocket.onopen = function (event) {
+          console.log("WebSocket connection opened:", event);
+          wsStatus.textContent = "Connected";
+          wsStatus.classList.remove("text-red-500", "text-yellow-500");
+          wsStatus.classList.add("text-green-500");
+          addMessage("WebSocket connection established.", "info");
+        };
+
+        websocket.onmessage = function (event) {
+          console.log("WebSocket message received:", event.data);
+          try {
+            const message = JSON.parse(event.data);
+
+            if (message.type === "clientId") {
+              // Received the client ID from the backend
+              currentClientId = message.clientId;
+              clientIdSpan.textContent = currentClientId;
+              addMessage(`Received Client ID: ${currentClientId}`, "info");
+              console.log(`Stored Client ID: ${currentClientId}`);
+              // Enable the button now that we have the client ID
+              processButton.disabled = false;
+            } else if (message.type === "processingResult") {
+              // Received a processing result
+              const resultPayload = message.payload;
+              const requestId = resultPayload.requestId;
+
+              console.log(
+                `Received processing result for Request ID: ${requestId}`
+              );
+              console.log("Result Payload:", resultPayload);
+
+              // Find the corresponding pending request element
+              const requestElement = pendingRequests.get(requestId);
+
+              if (requestElement) {
+                // Update the element with the structured result display
+                displayStructuredResult(requestElement, resultPayload);
+                pendingRequests.delete(requestId); // Remove from pending map
+              } else {
+                // Result received but no matching pending request found (e.g., page refresh)
+                addMessage(
+                  `Received result for unknown Request ID: ${requestId}`,
+                  "warning"
+                );
+                // You might want to store this result or handle it differently
+              }
+            } else {
+              // Handle other message types if any
+              addMessage(
+                `Received unknown message type: ${message.type}`,
+                "warning"
+              );
+            }
+          } catch (error) {
+            console.error("Error parsing WebSocket message:", error);
+            addMessage("Error processing WebSocket message.", "error");
+          }
+        };
+
+        websocket.onerror = function (event) {
+          console.error("WebSocket error:", event);
+          wsStatus.textContent = "Error";
+          wsStatus.classList.remove("text-green-500", "text-yellow-500");
+          wsStatus.classList.add("text-red-500");
+          addMessage("WebSocket error occurred.", "error");
+          // Disable the button on error
+          processButton.disabled = true;
+        };
+
+        websocket.onclose = function (event) {
+          console.log("WebSocket connection closed:", event);
+          wsStatus.textContent = "Disconnected";
+          wsStatus.classList.remove("text-green-500", "text-red-500");
+          wsStatus.classList.add("text-yellow-500");
+          addMessage(
+            "WebSocket connection closed. Attempting to reconnect...",
+            "warning"
+          );
+          // Disable the button on close
+          processButton.disabled = true;
+
+          // Attempt to reconnect after a delay
+          setTimeout(connectWebSocket, 5000); // Retry every 5 seconds
+        };
+      }
+
+      // --- Function to display the structured result ---
+      function displayStructuredResult(element, result) {
+        element.innerHTML = ""; // Clear the placeholder
+
+        const resultContainer = document.createElement("div");
+        resultContainer.classList.add("result-container"); // Use the custom class
+
+        // --- Transcript Analysis Section ---
+        const analysis = result.transcript_analysis;
+        if (analysis) {
+          const analysisSection = document.createElement("div");
+          analysisSection.classList.add("result-section");
+          analysisSection.innerHTML = `
+                    <h3 class="text-lg font-semibold mb-2 text-gray-700">Transcript Analysis</h3>
+                    <p><span class="font-medium">Person Name:</span> ${
+                      analysis.person_name || "N/A"
+                    }</p>
+                    <p><span class="font-medium">Summary:</span> ${
+                      analysis.summary || "N/A"
+                    }</p>
+                    <p><span class="font-medium">Location Mentioned:</span> ${
+                      analysis.location || "N/A"
+                    }</p>
+                    <p><span class="font-medium">Timestamp Mentioned:</span> ${
+                      analysis.timestamp || "N/A"
+                    }</p>
+                    <p><span class="font-medium">Suggestion:</span> ${
+                      analysis.suggestion || "N/A"
+                    }</p>
+                    <p class="mt-2"><span class="font-medium">Departments to Contact:</span> ${
+                      analysis.depts && analysis.depts.length > 0
+                        ? analysis.depts.join(", ")
+                        : "None"
+                    }</p>
+                    <p class="mt-2"><span class="font-medium">Key Issues:</span> ${
+                      analysis.key_issues && analysis.key_issues.length > 0
+                        ? analysis.key_issues.join(", ")
+                        : "None"
+                    }</p>
+                `;
+          resultContainer.appendChild(analysisSection);
+        }
+
+        // --- Closest Nearby Services Section ---
+        const services = result.closest_nearby_services;
+        if (services && Object.keys(services).length > 0) {
+          const servicesSection = document.createElement("div");
+          servicesSection.classList.add("result-section");
+          servicesSection.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-gray-700">Closest Nearby Services</h3>`;
+
+          for (const dept in services) {
+            const place = services[dept];
+            if (place) {
+              servicesSection.innerHTML += `
+                             <div class="ml-4 mt-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+                                 <p><span class="font-medium">${
+                                   dept.charAt(0).toUpperCase() + dept.slice(1)
+                                 }:</span> ${place.name || "N/A"}</p>
+                                 <p class="text-xs text-gray-600">ID: ${
+                                   place.id || "N/A"
+                                 }</p>
+                                 <p class="text-xs text-gray-600">Distance: ${
+                                   place.distance_meters !== undefined
+                                     ? `${place.distance_meters.toFixed(
+                                         2
+                                       )} meters`
+                                     : "N/A"
+                                 }</p>
+                                 <p class="text-xs text-gray-600">Location: Lat ${
+                                   place.lat !== undefined
+                                     ? place.lat.toFixed(6)
+                                     : "N/A"
+                                 }, Lng ${
+                place.lng !== undefined ? place.lng.toFixed(6) : "N/A"
+              }</p>
+                             </div>
+                         `;
+            } else {
+              servicesSection.innerHTML += `
+                             <div class="ml-4 mt-2 p-3 bg-yellow-50 rounded-md border border-yellow-200">
+                                 <p><span class="font-medium">${
+                                   dept.charAt(0).toUpperCase() + dept.slice(1)
+                                 }:</span> No nearby service found within radius.</p>
+                             </div>
+                         `;
+            }
+          }
+          resultContainer.appendChild(servicesSection);
+        } else {
+          const noServicesSection = document.createElement("div");
+          noServicesSection.classList.add("result-section");
+          noServicesSection.innerHTML = `<p class="text-gray-600">No nearby services identified based on analysis.</p>`;
+          resultContainer.appendChild(noServicesSection);
+        }
+
+        // Add Request ID and Timestamp at the bottom
+        const metaSection = document.createElement("div");
+        // Corrected classList.add to add classes individually
+        metaSection.classList.add("text-xs", "text-gray-500", "pt-4");
+
+        metaSection.innerHTML = `
+                 <p>Request ID: ${result.requestId || "N/A"}</p>
+                 <p>Timestamp: ${result.timestamp || "N/A"}</p>
+             `;
+        resultContainer.appendChild(metaSection);
+
+        // Append the structured result container to the messages div
+        messagesDiv.appendChild(resultContainer);
+
+        // Auto-scroll to the bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // --- Helper function to add simple text messages to the display ---
+      function addMessage(text, type = "info") {
+        const messageElement = document.createElement("p");
+        messageElement.textContent = text;
+        messageElement.classList.add("p-2", "rounded-md");
+
+        if (type === "info") {
+          messageElement.classList.add("bg-gray-200");
+        } else if (type === "success") {
+          messageElement.classList.add("bg-green-200");
+        } else if (type === "warning") {
+          messageElement.classList.add("bg-yellow-200");
+        } else if (type === "error") {
+          messageElement.classList.add("bg-red-200");
+        }
+
+        // Clear the initial waiting message if it exists
+        if (messagesDiv.querySelector(".text-gray-500")) {
+          messagesDiv.innerHTML = "";
+        }
+
+        messagesDiv.appendChild(messageElement);
+        // Auto-scroll to the bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // --- Event Listener for the Process Button ---
+      processButton.addEventListener("click", async () => {
+        const transcript = transcriptInput.value.trim();
+        const lat = latitudeInput.value.trim();
+        const lng = longitudeInput.value.trim();
+
+        if (!transcript || !lat || !lng || !currentClientId) {
+          addMessage(
+            "Please fill in all fields and ensure WebSocket is connected.",
+            "warning"
+          );
+          return;
+        }
+
+        // Disable the button while processing
+        processButton.disabled = true;
+        processButton.textContent = "Processing...";
+
+        const requestPayload = {
+          transcript: transcript,
+          lat: parseFloat(lat),
+          lng: parseFloat(lng),
+          clientId: currentClientId, // Include the client ID
+        };
+
+        try {
+          // Send the POST request to the Node.js backend using the absolute URL
+          const response = await fetch(httpEndpointUrl, {
+            // Corrected fetch URL
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestPayload),
+          });
+
+          const responseData = await response.json();
+
+          if (response.ok) {
+            // Request accepted and queued
+            const requestId = responseData.requestId;
+            addMessage(
+              `Request queued successfully! Request ID: ${requestId}`,
+              "success"
+            );
+
+            // Add a placeholder for the result and store the element reference
+            // The actual result will be displayed by displayStructuredResult when received via WS
+            const resultPlaceholder = document.createElement("div");
+            resultPlaceholder.innerHTML = `
+                        <div class="mt-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+                             <p class="font-semibold">Processing Request ID: ${requestId}...</p>
+                        </div>
+                    `;
+            messagesDiv.appendChild(resultPlaceholder);
+            pendingRequests.set(requestId, resultPlaceholder); // Store element reference
+          } else {
+            // Error from the backend API
+            addMessage(
+              `Error queuing request: ${
+                responseData.error || response.statusText
+              }`,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Error sending POST request:", error);
+          addMessage(`Failed to send request: ${error.message}`, "error");
+        } finally {
+          // Re-enable the button after the API call completes (regardless of success/failure)
+          // The result delivery is handled by the WebSocket
+          processButton.disabled = false;
+          processButton.textContent = "Process Emergency";
+        }
+      });
+
+      // --- Initial setup ---
+      // Disable the button until WebSocket is connected and client ID is received
+      processButton.disabled = true;
+      // Start the WebSocket connection when the page loads
+      connectWebSocket();
+    </script>
+  </body>
+</html>
