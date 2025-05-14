@@ -1,3 +1,5 @@
+
+
 // Import necessary modules
 const express = require("express");
 const http = require("http"); // Node.js core http module
@@ -8,6 +10,9 @@ const amqp = require("amqplib"); // RabbitMQ client library
 const dotenv = require("dotenv"); // To load environment variables
 const { v4: uuidv4 } = require("uuid"); // To generate unique IDs
 const cors = require("cors");
+const fs = require("fs");
+const Groq = require("groq-sdk");
+
 // Load environment variables from .env file
 dotenv.config();
 
@@ -17,11 +22,13 @@ const app = express();
 // Middleware to parse JSON request bodies
 app.use(express.json()); // Use express.json() built-in middleware
 const corsOptions = {
-  origin: "*", // Allow requests from file:// (origin 'null') and localhost:3000
-  methods: ["GET", "POST"], // Allow the necessary HTTP methods
-  credentials: true, // Allow cookies to be sent (if needed)
+  origin: "*",
+  methods: ["GET", "POST"],
+  credentials: true,
+  allowedHeaders: ["Content-Type"]
 };
 app.use(cors(corsOptions));
+
 // --- WebSocket Connection Management ---
 // In-memory map to store active WebSocket connections, keyed by a client ID
 // Create an HTTP server to host both Express and WebSocket server
@@ -85,6 +92,9 @@ let consumeChannel = null; // Channel for consuming results
 
 // --- In-memory storage for results (deprecated with WebSockets, but kept for reference) ---
 // const resultsStore = {};
+
+// Initialize Groq with your API key
+
 
 // Function to connect to RabbitMQ and set up channels
 async function connectRabbitMQ() {
