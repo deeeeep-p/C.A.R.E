@@ -10,10 +10,10 @@ import { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
-// Default location (fallback)
+// Default location for when user denies permissions
 const DEFAULT_LOCATION = {
-  latitude: 37.7749,
-  longitude: -122.4194
+  latitude: 0.7749,
+  longitude: 0.4194
 };
 
 export default function EmergencyRecordingApp() {
@@ -156,6 +156,7 @@ export default function EmergencyRecordingApp() {
         });
         
         const responseData = await response.json();
+        console.log("Response from server", responseData);
         
         if (response.ok) {
           const requestId = responseData.requestId;
@@ -174,6 +175,7 @@ export default function EmergencyRecordingApp() {
             newMap.set(requestId, { timestamp: new Date().toISOString() });
             return newMap;
           });
+          console.log("Processing result now", requestId);
           handleProcessingResult({
             requestId: requestId,
             status: 'processing',
@@ -285,23 +287,26 @@ const connectWebSocket = () => {
     }, []);
     
     // Handle processing result from WebSocket
+    // Inside handleProcessingResult function
     const handleProcessingResult = (result) => {
-      const requestId = result.requestId;
-      console.log('Received result:', result); // Debug log
-      
-      // Update services for UI display
-      if (result.transcript_analysis) {
-        const analysis = result.transcript_analysis;
-        setServices({
-          person_name: analysis.person_name || "Unknown",
-          summary: analysis.summary || "N/A",
-          location: analysis.location_mentioned || "N/A",
-          timestamp: analysis.timestamp_mentioned || "N/A",
-          suggestion: analysis.suggestion || "N/A",
-          depts: analysis.depts || [],
-          key_issues: analysis.key_issues || [],
-          type: analysis.type || "N/A"
-        });
+    const requestId = result.requestId;
+    console.log('Received result:', result); // Debug log
+    
+    // Update services for UI display
+    if (result.transcript_analysis) {
+    const analysis = result.transcript_analysis;
+    setServices({
+    person_name: analysis.person_name || "Unknown",
+    summary: analysis.summary || "N/A",
+    location: analysis.location_mentioned || "N/A",
+    timestamp: analysis.timestamp_mentioned || "N/A",
+    suggestion: analysis.suggestion || "N/A",
+    depts: analysis.depts || [],
+    key_issues: analysis.key_issues || [],
+    type: analysis.type || "N/A",
+    // Add this line to include closest_nearby_services
+    closest_nearby_services: result.closest_nearby_services || {}
+    });
       
         // Update UI display section
         addMessage(`Analysis complete for request: ${requestId}`, 'success');
@@ -482,16 +487,53 @@ return (
                     <Text className="text-white text-xl">{services.person_name}</Text>
                   </View>
                 
-                  <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
+                  {/* <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
                     <Text className="text-blue-400 text-base font-medium mb-2">Medical Instructions</Text>
                     <Text className="text-white text-xl">{services.suggestion}</Text>
-                  </View>
+                  </View> */}
                 
+                  {/* Key Points section */}
                   <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
                     <Text className="text-blue-400 text-base font-medium mb-2">Key Points</Text>
                     <Text className="text-white text-xl">{Array.isArray(services.key_issues) ? services.key_issues.join(' • ') : services.key_issues}</Text>
                   </View>
                 
+                  {/* Add Closest Nearby Services section */}
+                  {services.closest_nearby_services ? (
+                    <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
+                      <Text className="text-blue-400 text-base font-medium mb-2">Closest Nearby Services</Text>
+                      {Object.entries(services.closest_nearby_services).map(([dept, place]) => (
+                        place ? (
+                          <View key={dept} className="mt-3 bg-blue-900/30 p-3 rounded-lg border border-blue-800/50">
+                            <Text className="text-white font-medium">
+                              {dept.charAt(0).toUpperCase() + dept.slice(1)}: {place.name || "N/A"}
+                            </Text>
+                            <Text className="text-gray-400 text-sm">ID: {place.id || "N/A"}</Text>
+                            <Text className="text-gray-400 text-sm">
+                              Distance: {place.distance_meters !== undefined ? `${place.distance_meters.toFixed(2)} meters` : "N/A"}
+                            </Text>
+                            <Text className="text-gray-400 text-sm">
+                              Location: Lat {place.lat !== undefined ? place.lat.toFixed(6) : "N/A"}, 
+                              Lng {place.lng !== undefined ? place.lng.toFixed(6) : "N/A"}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View key={dept} className="mt-3 bg-yellow-900/30 p-3 rounded-lg border border-yellow-800/50">
+                            <Text className="text-white font-medium">
+                              {dept.charAt(0).toUpperCase() + dept.slice(1)}: No nearby service found within radius.
+                            </Text>
+                          </View>
+                        )
+                      ))}
+                    </View>
+                  ) : (
+                    <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
+                      <Text className="text-gray-400 text-base italic">
+                        No nearby services identified based on analysis.
+                      </Text>
+                    </View>
+                  )}
+
                   {Array.isArray(services.depts) && services.depts.length > 0 ? (
   <View className="mb-4 bg-slate-800/80 p-5 rounded-xl border border-slate-700">
     {/* <Text className="text-blue-400 text-base font-medium mb-2">Res</Text> */}
@@ -548,6 +590,8 @@ return (
                         params: {
                           lat: location.latitude,
                           lng: location.longitude,
+                          timestamp: new Date().toISOString(),
+                          closest_nearby_services: JSON.stringify(services.closest_nearby_services || {}),
                           // Convert array to string before passing
                           responseUnits: JSON.stringify([{
                             id: '1',
@@ -570,7 +614,7 @@ return (
                     >
                       <View className="items-center">
                         <Text className="text-white font-bold text-sm">Track</Text>
-                        <Text className="text-blue-200 text-xs">Updates</Text>
+                        <Text className="text-blue-200 text-xs">Updates </Text>
                       </View>
                     </TouchableOpacity>
                   </View>

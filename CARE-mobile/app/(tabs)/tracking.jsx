@@ -1,75 +1,106 @@
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native'
-import React, { useState } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Dimensions, StyleSheet } from 'react-native'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useCallback } from 'react'
+import { useLocalSearchParams } from 'expo-router'
+import MapView, { Marker, Circle, Polyline, PROVIDER_GOOGLE } from 'react-native-maps'
+
+const { width } = Dimensions.get('window')
 
 const Tracking = () => {
+  const params = useLocalSearchParams()
   const [refreshing, setRefreshing] = useState(false)
-  const [responders, setResponders] = useState([
-    { 
-      id: 1, 
-      name: 'Ambulance A', 
-      distance: '2km',
-      type: 'Advanced Life Support',
-      staff: '3 Paramedics',
-      status: 'Available',
-      equipment: ['Defibrillator', 'Ventilator', 'Emergency Medications']
-    },
-    { 
-      id: 2, 
-      name: 'Emergency Unit B', 
-      distance: '3.5km',
-      type: 'Basic Life Support',
-      staff: '2 EMTs',
-      status: 'En Route',
-      equipment: ['First Aid Kit', 'Oxygen Supply', 'Stretcher']
-    },
-    { 
-      id: 3, 
-      name: 'Medical Team C', 
-      distance: '4km',
-      type: 'Rapid Response',
-      staff: '1 Doctor, 2 Nurses',
-      status: 'Available',
-      equipment: ['Trauma Kit', 'Mobile Lab', 'Critical Care Equipment']
-    },
-  ])
+  const [routeCoordinates, setRouteCoordinates] = useState([])
+  const mapRef = useRef(null)
+  const [responders, setResponders] = useState([]) // Add this line
+
+  // Memoize parsed response units
+  const initialResponders = useMemo(() => {
+    try {
+      return params.responseUnits ? JSON.parse(params.responseUnits) : []
+    } catch (error) {
+      console.error('Error parsing response units:', error)
+      return []
+    }
+  }, [params.responseUnits])
+
+  // Memoize parsed nearby services
+  const nearbyServices = useMemo(() => {
+    try {
+      return params.closest_nearby_services ? 
+        JSON.parse(params.closest_nearby_services) : {}
+    } catch (error) {
+      console.error('Error parsing nearby services:', error)
+      return {}
+    }
+  }, [params.closest_nearby_services])
+
+  // Memoize user location
+  const userLocation = useMemo(() => ({
+    latitude: parseFloat(params.lat) || 0,
+    longitude: parseFloat(params.lng) || 0
+  }), [params.lat, params.lng])
+
+  // Set initial responders only once
+  useEffect(() => {
+    setResponders(initialResponders)
+  }, [initialResponders])
+
+  // Update route coordinates when hospital or user location changes
+  useEffect(() => {
+    if (nearbyServices.hospital) {
+      const coordinates = [
+        userLocation,
+        {
+          latitude: nearbyServices.hospital.lat,
+          longitude: nearbyServices.hospital.lng
+        }
+      ]
+      setRouteCoordinates(coordinates)
+
+      if (mapRef.current) {
+        mapRef.current.fitToCoordinates(coordinates, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true
+        })
+      }
+    }
+  }, [nearbyServices.hospital, userLocation])
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    // Simulate new data
+    setRefreshing(true);
+    // Add your refresh logic here
     setTimeout(() => {
-      setResponders([
-        { 
-          id: 1, 
-          name: 'Ambulance A', 
-          distance: Math.floor(Math.random() * 5) + 'km',
-          type: 'Advanced Life Support',
-          staff: '3 Paramedics',
-          status: 'Available',
-          equipment: ['Defibrillator', 'Ventilator', 'Emergency Medications']
-        },
-        { 
-          id: 2, 
-          name: 'Emergency Unit B', 
-          distance: Math.floor(Math.random() * 5) + 'km',
-          type: 'Basic Life Support',
-          staff: '2 EMTs',
-          status: 'En Route',
-          equipment: ['First Aid Kit', 'Oxygen Supply', 'Stretcher']
-        },
-        { 
-          id: 3, 
-          name: 'Medical Team C', 
-          distance: Math.floor(Math.random() * 5) + 'km',
-          type: 'Rapid Response',
-          staff: '1 Doctor, 2 Nurses',
-          status: 'Available',
-          equipment: ['Trauma Kit', 'Mobile Lab', 'Critical Care Equipment']
-        },
-      ])
-      setRefreshing(false)
-    }, 1000)
-  }, [])
+      setRefreshing(false);
+    }, 2000);
+  }, []);
+
+  const renderResponder = useCallback((responder) => (
+    <TouchableOpacity key={responder.id}>
+      <View className="bg-gray-800 p-4 rounded-lg mb-2 shadow-sm border border-red-900/20">
+        <View className="flex-row justify-between items-center">
+          <Text className="text-lg font-semibold text-red-50">{responder.name || 'Unknown'}</Text>
+          <Text className="text-gray-400">{responder.distance || 'N/A'} away</Text>
+        </View>
+        <Text className="text-gray-400 mt-1">{responder.type || 'N/A'}</Text>
+        <Text className="text-gray-400">Staff: {responder.staff || 'N/A'}</Text>
+        {responder.equipment && (
+          <View className="mt-2">
+            <Text className="text-gray-300 font-medium">Equipment:</Text>
+            <View className="flex-row flex-wrap mt-1">
+              {responder.equipment.slice(0, 5).map((item, index) => (
+                <Text key={index} className="text-gray-400 text-sm mr-2">• {item}</Text>
+              ))}
+            </View>
+          </View>
+        )}
+        <View className="mt-2 bg-gray-700/50 px-3 py-1 rounded-full self-start">
+          <Text className={`text-sm ${responder.status === 'Available' ? 'text-green-400' : 'text-yellow-400'}`}>
+            {responder.status || 'Unknown'}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  ), [])
 
   return (
     <ScrollView 
@@ -79,12 +110,79 @@ const Tracking = () => {
       }
     >
       <View className="p-4">
-        {/* Map Placeholder */}
-        <View className="h-48 bg-gray-800 rounded-lg items-center justify-center mb-4">
-          <Text className="text-gray-300 text-lg">Live Map Here</Text>
+        {/* Map View */}
+        <View style={styles.mapContainer}>
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={{
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            {/* User Location Marker */}
+            <Marker
+              coordinate={userLocation}
+              title="Your Location"
+              pinColor="red"
+            />
+            
+            {/* Hospital Marker */}
+            {nearbyServices.hospital && (
+              <Marker
+                coordinate={{
+                  latitude: nearbyServices.hospital.lat,
+                  longitude: nearbyServices.hospital.lng
+                }}
+                title={nearbyServices.hospital.name}
+                description={`${nearbyServices.hospital.distance_meters.toFixed(2)}m away`}
+                pinColor="blue"
+              />
+            )}
+
+            {/* Route Line */}
+            {routeCoordinates.length > 0 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#FF0000"
+                strokeWidth={3}
+                lineDashPattern={[1]}
+              />
+            )}
+
+            {/* Coverage Circle */}
+            <Circle
+              center={userLocation}
+              radius={500}
+              fillColor="rgba(255, 0, 0, 0.1)"
+              strokeColor="rgba(255, 0, 0, 0.3)"
+            />
+          </MapView>
         </View>
 
-        {/* Status Cards */}
+        {/* Nearby Services */}
+        <View className="mb-4">
+          <Text className="text-xl font-bold mb-3 text-red-100">Nearby Services</Text>
+          {nearbyServices.hospital ? (
+            <View className="bg-gray-800 p-4 rounded-lg mb-2 shadow-sm border border-blue-900/20">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-lg font-semibold text-blue-50">{nearbyServices.hospital.name}</Text>
+                <Text className="text-gray-400">{nearbyServices.hospital.distance_meters.toFixed(2)}m away</Text>
+              </View>
+              <Text className="text-gray-400 mt-1">ID: {nearbyServices.hospital.id}</Text>
+              <Text className="text-gray-400">
+                Location: {nearbyServices.hospital.lat}, {nearbyServices.hospital.lng}
+              </Text>
+            </View>
+          ) : (
+            <Text className="text-gray-400">No nearby hospitals found</Text>
+          )}
+        </View>
+
+        {/* Existing Status Cards and Responders List */}
         <View className="flex-row justify-between mb-4">
           <View className="bg-rose-600 p-4 rounded-lg flex-1 mr-2">
             <Text className="text-gray-100 font-bold">ETA</Text>
@@ -100,34 +198,23 @@ const Tracking = () => {
 
         {/* Responders List */}
         <Text className="text-xl font-bold mb-3 text-red-100">Nearby Responders</Text>
-        {responders.map((responder) => (
-          <TouchableOpacity key={responder.id}>
-            <View className="bg-gray-800 p-4 rounded-lg mb-2 shadow-sm border border-red-900/20">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-lg font-semibold text-red-50">{responder.name}</Text>
-                <Text className="text-gray-400">{responder.distance} away</Text>
-              </View>
-              <Text className="text-gray-400 mt-1">{responder.type}</Text>
-              <Text className="text-gray-400">Staff: {responder.staff}</Text>
-              <View className="mt-2">
-                <Text className="text-gray-300 font-medium">Equipment:</Text>
-                <View className="flex-row flex-wrap mt-1">
-                  {responder.equipment.map((item, index) => (
-                    <Text key={index} className="text-gray-400 text-sm mr-2">• {item}</Text>
-                  ))}
-                </View>
-              </View>
-              <View className="mt-2 bg-gray-700/50 px-3 py-1 rounded-full self-start">
-                <Text className={`text-sm ${responder.status === 'Available' ? 'text-green-400' : 'text-yellow-400'}`}>
-                  {responder.status}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+        {responders.slice(0, 10).map(renderResponder)}
       </View>
     </ScrollView>
   )
 }
+
+const styles = StyleSheet.create({
+  mapContainer: {
+    height: 288,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  }
+});
 
 export default Tracking
