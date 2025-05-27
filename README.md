@@ -65,8 +65,9 @@ CARE stands for Critical AI Response Engine. It is a cross-platform solution tha
 - **Models & Pipelines:** [HuggingFace Transformers](https://huggingface.co/transformers/)
 
 ### 🔧 **Backend**
-- **API Framework:** [FastAPI](https://fastapi.tiangolo.com/)
-- **Realtime:** WebSockets, [Firebase](https://firebase.google.com/)
+- **API Framework:** [FastAPI](https://fastapi.tiangolo.com/), [Node.js](https://nodejs.org/docs)
+- **Realtime:** WebSockets
+- **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) via [Docker](https://www.docker.com/) container
 
 ### 🗄️ **Database**
 - **Primary DB:** [PostgreSQL](https://www.postgresql.org/)
