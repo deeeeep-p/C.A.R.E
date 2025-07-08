@@ -12,7 +12,7 @@
 - 🧭 **AI Incident Classification Engine** – understands user context via voice, text, or image  
 - 🛰 **Responder Dashboard** *(React + Tailwind CSS)* – for real-time dispatch & live incident tracking  
 - 🌐 **Geolocation & Routing** – suggests optimal responder paths and tracks incidents live  
-- 🔗 **Secure API Layer** *(FastAPI + Dockerized RabbitMQ)* – handles role-based comms & real-time updates  
+- 🔗 **Secure API Layer** *(FastAPI + RabbitMQ)* – handles role-based comms & real-time updates  
 
 ---
 
@@ -77,7 +77,7 @@
 ### 🔧 **Backend**
 - **API Framework:** [FastAPI](https://fastapi.tiangolo.com/), [Node.js](https://nodejs.org/docs)
 - **Realtime:** WebSockets
-- **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) via [Docker](https://www.docker.com/) container
+- **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/)]
 
 ### 🗄️ **Database**
 - **Primary DB:** [PostgreSQL](https://www.postgresql.org/)
