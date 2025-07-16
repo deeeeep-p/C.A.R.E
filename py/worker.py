@@ -112,7 +112,6 @@ def findPlacesWithinRadius(
   radiusMeters,
   dept # Assuming dept is the table name (e.g., 'police', 'firebrigade')
 ):
-  print("insidefn")
   """
   Finds places within a given radius from a center point, ordered by distance.
   Uses the specified department name as the table name.
@@ -254,6 +253,7 @@ def on_message_received(ch, method, properties, body):
         # --- Perform the Langchain processing (calling the async function) ---
         # Use asyncio.run() to execute the async Langchain chain from this sync callback
         processed_transcript_data = asyncio.run(process_transcript_async(transcript))
+        print(processed_transcript_data)
 
         if processed_transcript_data is None:
             print(f" [!] Transcript processing failed for request ID: {request_id}. Result not published.")
@@ -271,7 +271,7 @@ def on_message_received(ch, method, properties, body):
         closest_places_results = {} # Store closest place for each dept
 
         # Perform spatial lookup for the closest place for each relevant department
-        radius = 10000 # Define search radius in meters (increased for better chance of finding something)
+        radius = 100000 # Define search radius in meters (increased for better chance of finding something)
 
         # Looping through departments and finding the single closest place for each
         for dept in depts_to_contact:

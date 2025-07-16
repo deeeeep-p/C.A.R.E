@@ -11,24 +11,14 @@ from psycopg2.extras import RealDictCursor # To get results as dictionaries
 # --- Import Langchain components needed to build the chain ---
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables import RunnableSequence
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 
-# --- Flask Setup (Optional, if you still need Flask endpoints) ---
-# from flask import Flask, request, jsonify
-# app = Flask(__name__)
-# Note: Running a blocking RabbitMQ consumer in the main Flask thread
-# will prevent Flask from handling HTTP requests.
-# For a proper setup, consider running the consumer in a separate thread/process
-# or using an async Flask framework with an async pika client.
-# For this example, we focus on the consumer logic as a standalone worker.
 
 
 # Load environment variables from .env file
 load_dotenv()
 
-# --- Configuration ---
 # Explicitly set the environment variable for Langchain to pick up
 os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
 
@@ -223,7 +213,6 @@ def on_message_received(ch, method, properties, body):
         # --- Perform the Langchain processing (calling the async function) ---
         # Use asyncio.run() to execute the async Langchain chain from this sync callback
         processed_transcript_data = asyncio.run(process_transcript_async(transcript))
-
         if processed_transcript_data is None:
             print(f" [!] Transcript processing failed for request ID: {request_id}. Result not published.")
             # Acknowledge the message even if processing failed, to prevent retries on a likely unrecoverable error

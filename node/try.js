@@ -1,5 +1,3 @@
-
-
 // Import necessary modules
 const express = require("express");
 const http = require("http"); // Node.js core http module
@@ -10,8 +8,7 @@ const amqp = require("amqplib"); // RabbitMQ client library
 const dotenv = require("dotenv"); // To load environment variables
 const { v4: uuidv4 } = require("uuid"); // To generate unique IDs
 const cors = require("cors");
-const fs = require("fs");
-const Groq = require("groq-sdk");
+// const fs = require("fs");
 
 // Load environment variables from .env file
 dotenv.config();
@@ -25,25 +22,17 @@ const corsOptions = {
   origin: "*",
   methods: ["GET", "POST"],
   credentials: true,
-  allowedHeaders: ["Content-Type"]
+  allowedHeaders: ["Content-Type"],
 };
 app.use(cors(corsOptions));
 
-// --- WebSocket Connection Management ---
-// In-memory map to store active WebSocket connections, keyed by a client ID
-// Create an HTTP server to host both Express and WebSocket server
 const server = http.createServer(app);
 
-// Create a WebSocket server instance, attaching it to the HTTP server
 const wss = new WebSocket.Server({ server });
-// In a real application, you'd need a more robust way to manage connections
-// across potentially multiple Node.js instances and handle disconnections/reconnections.
 const clients = new Map();
 
 // Event listener for new WebSocket connections
 wss.on("connection", function connection(ws, req) {
-  // Generate a unique ID for this client connection
-  // In a real app, you might get a user ID or session ID from the request/cookies
   const clientId = uuidv4();
   clients.set(clientId, ws);
 
@@ -94,7 +83,6 @@ let consumeChannel = null; // Channel for consuming results
 // const resultsStore = {};
 
 // Initialize Groq with your API key
-
 
 // Function to connect to RabbitMQ and set up channels
 async function connectRabbitMQ() {
@@ -161,7 +149,6 @@ async function connectRabbitMQ() {
 
 // Function to handle received result messages from the results queue
 function onResultReceived(msg) {
-  console.log("hiiiii");
   // Check if the message is null (e.g., consumer cancelled)
   if (msg === null) {
     console.log("[AMQP] Consumer cancelled by server.");
@@ -327,7 +314,7 @@ app.get("/fireBrigade", async (req, res) => {
 // Route to find places within radius (using your existing controller/dist.js)
 // NOTE: This route is now less relevant in the RabbitMQ flow, as the spatial lookup
 // happens in the Python worker. You might keep it for testing purposes.
-const { findPlacesWithinRadius } = require("./controller/dist.js"); // Assuming this is your Node.js version
+const { findPlacesWithinRadius } = require("./controllers/dist.js"); // Assuming this is your Node.js version
 app.post("/find_dist", async (req, res) => {
   const { lat, lng, radius, dept } = req.body;
   try {

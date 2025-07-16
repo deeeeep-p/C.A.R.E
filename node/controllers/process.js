@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { findPlacesWithinRadius } = require("../controller/dist.js");
+const { findPlacesWithinRadius } = require("./dist.js");
 
 const processTranscript = async (req, res) => {
   try {
