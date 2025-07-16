@@ -267,20 +267,34 @@ app.post("/schools", async (req, res) => {
 // Route to setup department tables (using your existing pool)
 app.post("/setup", async (req, res) => {
   try {
+    console.log("Request body:", req.body); // Add this line for debugging
     const { dept } = req.body;
-    // Basic validation for dept name to prevent SQL injection in table name
-    if (!/^[a-zA-Z0-9_]+$/.test(dept)) {
-      return res.status(400).json({ error: "Invalid department name." });
+    
+    if (!dept) {
+      return res.status(400).json({ error: "Department name is required" });
     }
+
+    console.log("Setting up table for:", dept);
+    
+    // Basic validation for dept name to prevent SQL injection
+    if (!/^[a-zA-Z0-9_]+$/.test(dept)) {
+      return res.status(400).json({ error: "Invalid department name" });
+    }
+
     await pool.query(
-      `CREATE TABLE IF NOT EXISTS ${dept}( id SERIAL PRIMARY KEY, name VARCHAR(100),location GEOGRAPHY(Point, 4326));` // Added IF NOT EXISTS
+      `CREATE TABLE IF NOT EXISTS ${dept}( 
+        id SERIAL PRIMARY KEY, 
+        name VARCHAR(100),
+        location GEOGRAPHY(Point, 4326)
+      );`
     );
+
     return res.status(201).json({
-      message: `${dept} Table created successfully or already exists`,
+      message: `${dept} Table created successfully`
     });
   } catch (error) {
-    console.error(`Error setting up table for ${dept}:`, error);
-    res.status(500).json({ error: `Failed to set up table for ${dept}` });
+    console.error("Setup error:", error);
+    res.status(500).json({ error: `Failed to set up table: ${error.message}` });
   }
 });
 

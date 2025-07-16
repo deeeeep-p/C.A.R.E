@@ -20,7 +20,7 @@ import { FadeIn, FadeInDown, FadeInUp } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 
-// Default location (fallback)
+// Default location for when user denies permissions
 const DEFAULT_LOCATION = {
   latitude: 37.7749,
   longitude: -122.4194,
